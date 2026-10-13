@@ -1,0 +1,17 @@
+{
+  "name": "书声 · 小说阅读与听书",
+  "short_name": "书声",
+  "description": "整合各类免费小说的在线阅读与听书平台：分类推荐、关键字搜索、章节自由跳转、多音色朗读、书架收藏与阅读记录。",
+  "lang": "zh-CN",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#12141c",
+  "theme_color": "#12141c",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

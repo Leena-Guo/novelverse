@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="ink">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#12141c" />
+  <title>书声 · 小说阅读与听书</title>
+  <meta name="description" content="整合各类免费小说的在线阅读与听书平台：分类推荐、关键字搜索、章节自由跳转、多音色朗读、书架收藏与阅读记录。" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="书声" />
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="topbar" id="topbar">
+      <a class="brand" href="#/">
+        <span class="brand-mark">书</span>
+        <span class="brand-name">书声</span>
+        <span class="brand-sub">阅读 · 听书</span>
+      </a>
+      <nav class="mainnav desktop-only" id="mainnav">
+        <a href="#/" data-nav="home">首页</a>
+        <a href="#/category" data-nav="category">分类</a>
+        <a href="#/tags" data-nav="tags">题材</a>
+        <a href="#/rank" data-nav="rank">排行榜</a>
+        <a href="#/shelf" data-nav="shelf">书架</a>
+        <a href="#/history" data-nav="history">阅读记录</a>
+        <a href="#/downloads" data-nav="downloads">离线</a>
+        <a href="#/share" data-nav="share">手机扫码</a>
+      </nav>
+      <form class="searchbar" id="searchbar" role="search">
+        <input type="search" name="q" placeholder="搜书名 / 作者 / 关键词" autocomplete="off" enterkeyhint="search" />
+        <button type="submit" aria-label="搜索"><span class="s-ico">🔍</span><span class="s-txt">搜索</span></button>
+      </form>
+      <div class="topbar-actions">
+        <a class="user-btn" id="userBtn" href="#/login" title="登录 / 我的">👤 <span id="userName">登录</span></a>
+        <button class="icon-btn desktop-only" id="themeToggle" title="切换主题" aria-label="切换主题">☾</button>
+      </div>
+    </header>
+
+    <main id="main" class="main"></main>
+
+    <footer class="footer desktop-only">
+      <span>书声 · 小说聚合阅读与听书演示站</span>
+      <span class="dot">·</span>
+      <a href="#/admin">抓取与书库状态</a>
+      <span class="dot">·</span>
+      <span>内容来自网络，仅供学习交流</span>
+    </footer>
+  </div>
+
+  <!-- 手机端底部标签栏（App 式导航） -->
+  <nav class="tabbar" id="tabbar" aria-label="主导航">
+    <a href="#/" data-nav="home"><b>🏠</b><span>首页</span></a>
+    <a href="#/category" data-nav="category"><b>📚</b><span>分类</span></a>
+    <a href="#/rank" data-nav="rank"><b>🏆</b><span>排行</span></a>
+    <a href="#/shelf" data-nav="shelf"><b>⭐</b><span>书架</span></a>
+    <a href="#/account" data-nav="account"><b>👤</b><span>我的</span></a>
+  </nav>
+
+  <!-- 迷你播放条：后台听书时显示，切换界面仍继续播放，可单独停止 -->
+  <div class="mini-player" id="miniPlayer" hidden>
+    <button class="mp-btn" id="mpPlay" aria-label="播放 / 暂停" title="播放 / 暂停">▶</button>
+    <button class="mp-info" id="mpInfo" aria-label="展开听书面板">
+      <b id="mpTitle">正在听书</b>
+      <span id="mpSub">—</span>
+    </button>
+    <button class="mp-btn" id="mpOpen" aria-label="听书面板" title="听书面板">🎧</button>
+    <button class="mp-btn mp-danger" id="mpClose" aria-label="停止听书" title="停止听书">✕</button>
+  </div>
+
+  <div id="toast" class="toast" aria-live="polite"></div>
+
+  <script type="module" src="/js/app.js"></script>
+</body>
+</body>
+</html>

@@ -1,0 +1,215 @@
+书声 · 小说阅读与听书平台 —— 使用说明
+=====================================
+
+（本文件为速查版；完整技术文档见同目录 README.md）
+
+★ 一键启动 / 固定外网网址（推荐，最常用）
+------------------------------------------
+  bash /root/.opencode/bin/novelverse/start-remote.sh
+
+  执行后即可用（重启电脑后重新跑一次，网址不变）：
+    · 固定外网网址：https://<节点名>.<tailnet>.ts.net
+    · 手机打开上面网址 → 浏览器菜单「添加到主屏幕」→ 桌面出现图标，点开即用
+    · 访问口令：见项目下隐藏文件 .share_creds（用户名 shusheng，密码在其中）
+    · 电脑上打开 http://localhost:8787/#/share 有二维码，扫码即进
+      （二维码/链接已内置口令 ?k=… ，免输密码；等同密码，勿外发）
+    · 本机也存了一份二维码图片：.qr_access.png（600 权限，含令牌，等同密码）
+
+  原理：用 Tailscale Funnel 把本机 8787 映射到固定 https 域名（重启不变）。
+        脚本自动：开启 Funnel → 停旧服务 → 带「固定网址 + 口令」重启。
+        安全：服务只监听 127.0.0.1（远端无法直连，只能经隧道），并以低权限
+        用户 shusheng 运行；公网/局域网访问必须带口令或 ?k= 令牌。
+
+
+一、这是什么 / 架构原理
+------------------------
+一个「零依赖」的自建免费小说站（只用 Node 内置模块，无 npm 依赖、无打包）：
+
+  [多书源爬虫] --> [SQLite 书库缓存] --> [Node HTTP 服务:8787] --> [手机浏览器 PWA]
+      抓取            目录/正文落地           API + 静态页面           阅读/听书/书架
+
+  - 抓取：从免费书源（笔趣阁、笔趣书阁…）按分类批量抓书目，打开书时抓目录，
+          第一次读某章时抓正文并缓存（目录全量、正文按需）。
+  - 阅读：手机浏览器打开即用，支持上下滚动 / 左右翻页 / 上下翻页三种模式。
+  - 听书：服务端在线 TTS（百度合成 + ffmpeg 变声）并缓存，任何浏览器都能听；
+          内置 6 种音色，支持倍速、后台听书。
+  - 离线：可整本下载到手机（PWA + IndexedDB），断网可读可听。
+
+
+二、多书源（重点）
+------------------
+搜索会「同时并发查询所有书源」并把结果汇总，每条都标注来源，可分别导入本地书库。
+
+  | 书源     | 站点              | 说明                                   |
+  |----------|-------------------|----------------------------------------|
+  | 笔趣阁   | m.biqugen.com     | 书目量大；正文为混淆编码，适配器解码   |
+  | 笔趣书阁 | www.bqg10.cc      | 补充索引，含部分笔趣阁没有的书         |
+
+  - 例：《我的师兄实在太稳健了》只有「笔趣书阁」收录，搜索即可命中。
+  - 想加新书源：在 src/crawler/ 下实现 5 个方法（listBooks/search/bookDetail/
+    chapterListPage/chapterContent），同模板镜像站可用工厂函数一行注册：
+      makeBiqugeSite({ id, name, base })      // 见 src/crawler/index.mjs
+  - 已实测排除（模板不一致 / 目录 JS 懒加载 / SSL 超时）：biquge365.net、88biquge.com、
+    blqukan.cc、xshuquge.net、xbiquwk.com、bqg221.com 等。
+
+
+三、服务器端（本机 WSL2 Ubuntu，无 systemd）
+-------------------------------------------
+目录：/root/.opencode/bin/novelverse
+
+启动（推荐用一键脚本，含固定外网网址 + 口令）：
+  bash /root/.opencode/bin/novelverse/start-remote.sh
+
+仅本机使用、不要外网/局域网时：
+  cd /root/.opencode/bin/novelverse
+  HOST=127.0.0.1 SHARE=0 nohup node --no-warnings server.mjs > /tmp/opencode/novelverse.log 2>&1 &
+
+  注意：一键脚本默认已用 HOST=127.0.0.1（只监听本机）。
+  若要让同一 Wi-Fi 的手机直连，需显式放开：HOST=0.0.0.0 bash start-remote.sh
+  （此时局域网访问同样需要口令，不再免密）。
+
+  # 或用 npm 脚本
+  npm start                # 前台启动（默认 http://localhost:8787）
+  npm run dev              # 带 --watch 热重载，改后端代码自动重启
+
+停止 / 重启：
+  pkill -f "node --no-warnings server.mjs"      # 停止（也可用 kill $(cat .run_server.pid)）
+  # 重启：先停，再执行上面的启动命令
+
+注意：改 public/ 下的前端（app.js/api.js/css/sw.js）无需重启，刷新即可；
+      改 src/ 下的后端代码必须重启进程才生效。
+
+看日志：tail -f /tmp/opencode/novelverse.log
+
+抓取与维护（后台任务，也可在网页「抓取与书库状态」页点按钮）：
+  npm run sync            # 浅抓：各分类人气榜（快）
+  npm run sync:deep       # 全量：分类 × 榜单，约 8000+ 本
+  npm run sync:ultra      # 深度：再叠加字数段 × 状态，数万本（较久）
+  npm run update          # 手动执行一次「每日维护」（更新 + 扩充 + 清违规）
+  npm run update expand   # 仅扩充书库
+
+每日自动更新：服务启动后内置调度器，默认每天 01:00 自动抓取。
+可用环境变量 AUTO_UPDATE=0 关闭，改用 crontab：
+  0 1 * * *  cd /root/.opencode/bin/novelverse && node --no-warnings scripts/update.mjs >> data/update.log 2>&1
+
+
+四、客户端（手机 / 电脑浏览器）
+-------------------------------
+外网 / 流量下（推荐，固定网址）：
+  https://<节点名>.<tailnet>.ts.net   手机任意网络（含 4G/5G）都能打开，重启不变。
+  电脑上看二维码：http://localhost:8787/#/share
+  （手机首次可能要求输入访问口令，用户名/密码见 .share_creds；
+    用带 ?k= 的二维码链接打开一次后即写入 Cookie，之后免密。）
+
+同一 Wi-Fi 局域网直连（默认关闭，更安全）：
+  默认服务只监听 127.0.0.1，所以 http://172.22.4.109:8787 打不开。
+  若确需直连：HOST=0.0.0.0 bash start-remote.sh 重启后，手机连同一 Wi-Fi
+  打开 http://172.22.4.109:8787（IP 以启动日志为准），同样需要口令。
+
+目录排序：
+  书籍详情页与阅读器「章节目录」都「不分页、一次显示全部章节」，且「一行一章」。
+  右上角「↑ 正序 / ↓ 倒序」可切换排列方式（选择会被记住）。
+  章节多时可用「筛选章节」框快速查找。
+
+主要页面（PWA，可「添加到主屏幕」当 App 用）：
+  - 首页：推荐 / 热门 / 分类
+  - 搜索：输入书名或作者（会同时搜本地书库 + 全部网络书源）
+  - 阅读：点两侧翻页、点中间弹出菜单；翻页到头自动切上/下一章；
+          工具栏 ‹ / › 统一切章；长按段落从该处朗读
+  - 听书：底部「🎧」，可从当前看到的位置起读；支持倍速、后台播放（锁屏有控件）；
+          面板顶栏显示「章节名」（副行为「书名 · 第 N/M 段」）；
+          面板内「⏮ 上一章 / 下一章 ⏭」用于切章（阅读中会同步翻章并续播）；
+          下方「上一段 / 下一段」是段落级跳转（跳过某段），两者分开；
+          内置 6 种音色（标准女声 / 温柔 / 清亮 /
+          低沉男声 / 磁性男声 / 童声，后 5 种为服务器变声）；
+          点「📖 看原文」可收起面板并跳到正在朗读的那一段（跨章自动跳转定位）。
+  - 离线下载：书籍详情页「⬇ 离线下载」整本缓存
+
+账号与同步：支持注册 / 登录，书架、阅读进度、历史可随账号同步（未登录也有本地记录）。
+
+凭据：账号存在服务端 SQLite（data/），口令经 scrypt 哈希，不存明文。
+
+
+五、故障排查
+------------
+  现象                        处理办法
+  --------------------------  ----------------------------------------------
+  手机打不开                  确认手机能上网；用固定网址 https://<节点名>.<tailnet>.ts.net
+  外网网址打不开              先确认 tailscale 在线：tailscale status；若提示
+                              「未运行」说明重启后没自启，直接重跑 start-remote.sh
+                              （它会自动拉起 tailscaled 再开 Funnel）。网址固定
+  扫码打不开、但电脑能开      本机 MagicDNS 把域名解析成自己的 100.x 地址，「自己
+                              连自己」永远是通的，会掩盖真正的故障。要测公网入口：
+                              tailscale funnel status 应为 on，且外部访问不能是
+                              Broken pipe / TLS 握手 0 字节。出现该现象＝funnel
+                              没注册到控制平面：重跑 bash start-remote.sh（脚本会
+                              自动 off/on 重注册并校验，输出「✓ 公网入口可达」）；
+                              仍不行就 pkill -x tailscaled 后再跑一次
+                              （注意用 -x 精确匹配，不要用 pkill -f）
+  浏览器一直弹要密码          输入 .share_creds 里的用户名/密码；或改用带 ?k= 的
+                              链接（/#/share 页的二维码）打开一次即可免密
+  提示「尝试过于频繁」        同一来源 10 分钟内输错口令 20 次被限流（防暴破）；
+                              等 10 分钟后再试，或改用带 ?k= 的链接访问
+  局域网 IP 打不开            默认只监听 127.0.0.1（更安全），属正常；确需直连用
+                              HOST=0.0.0.0 bash start-remote.sh 重启（需口令）
+  目录想改顺序                目录右上角点「↑ 正序 / ↓ 倒序」切换，选择会被记住
+  变声音色不见/报错          服务器需装 ffmpeg（含 rubberband 滤镜）。检查：
+                              ffmpeg -filters | grep rubberband；缺则 apt install ffmpeg
+  某本书搜不到                该书全部书源都没有；可在「抓取与书库状态」页
+                              换个分类深度抓取后再搜
+  搜索很慢/一直转             某一书源故障时最多等 8 秒（可调 CRAWL_SEARCH_TIMEOUT），
+                              其余书源结果照常返回
+  章节加载失败                源站临时抽风，稍后重试；正文第一次读才抓取
+  离线下载很慢                正文第一次要现去源站抓（约 1~2 秒/章），下载一次
+                              后服务端就有缓存，之后同样内容是毫秒级。并发由
+                              CRAWL_CONCURRENCY 控制（默认 12，源站限流可回调
+                              4）；手机端并发在 public/js/offline.js
+  改后端代码不生效            需要重启 node 进程（见第三节）
+  改前端不生效                刷新页面；若装了 PWA，Service Worker 缓存需
+                              刷新或升级版本号（public/sw.js 的 CACHE）
+  端口被占用                  换端口：PORT=8899 node server.mjs
+
+
+六、安全说明（已加固）
+---------------------
+  访问边界：服务只监听 127.0.0.1 → 远端无法直连端口，公网只能经 Tailscale
+            Funnel（从本机 loopback 转发）。鉴权规则：
+              本机 loopback 进程直连       → 免密
+              公网 / 局域网 / 其它来源       → 必须口令 或 ?k= 令牌 / Cookie
+  运行身份：以专用低权限系统用户 shusheng 运行（setpriv 降权，非 root）。
+  暴力破解：同一来源 10 分钟内失败 20 次 → 返回 429，锁定 10 分钟。
+  响应头：  nosniff / X-Frame-Options DENY / no-referrer / 严格 CSP；
+            HTTPS 下附 HSTS；CSP 要求无内联脚本（已把内联脚本移入 app.js）。
+  端口：    服务默认只监听 127.0.0.1:8787，不对外暴露局域网端口。
+
+  想让外网彻底关闭：tailscale funnel off（或 SHARE=0 启动、不跑 start-remote.sh）。
+  口令/令牌轮换：修改 .share_creds 里的 ACCESS_PASSWORD 后重跑 start-remote.sh，
+                 并到 /#/share 重新扫码（?k= 令牌会随口令自动重算）。
+
+
+七、相关文件清单
+----------------
+  start-remote.sh               一键启动（开 Funnel + 降权用户 + 仅监听本机 + 口令）★
+  .share_creds                  访问口令凭据（600 权限；勿外泄/勿提交公开仓库）
+  .run_server.pid               服务进程号（脚本写入，用于下次干净重启）
+  server.mjs                    服务入口（HTTP + 静态 + PWA + 隧道 + 鉴权）
+  src/config.mjs                配置（含访问口令与 URL 令牌 token）
+  src/crawler/index.mjs         书源注册表（sources / getSource / sourceList）
+  src/crawler/biqugen.mjs       笔趣阁适配器
+  src/crawler/bqg10.mjs         笔趣书阁适配器（工厂 makeBiqugeSite）
+  src/crawler/http.mjs          抓取（重试/超时/限速；搜索单独限时）
+  src/crawler/parse.mjs         书源通用解析工具
+  src/services/books.mjs        书籍/章节查询（getChapters 支持 limit=0 全量、sort）
+  src/api.mjs                   所有 /api 接口（含跨源聚合搜索、分享信息）
+  src/services/catalog.mjs      目录同步 / 章节抓取 / 自动补充
+  src/services/tts.mjs          服务端 TTS 合成 + 多音色变声（ffmpeg rubberband）
+  public/js/app.js              前端主逻辑（多源搜索、目录不分页 + 正倒序）
+  public/js/tts.js              听书引擎（双 <audio> 预载、预取、音色、倍速）
+  public/css/app.css            样式（含超长目录 content-visibility 优化）
+  public/sw.js                  Service Worker（改前端后升 CACHE 版本号）
+  data/                         SQLite 数据库、封面缓存、TTS 缓存（勿删）
+  README.md                     完整技术文档
+
+敏感提醒：data/ 内含用户账号与阅读数据；.share_creds 含访问口令；
+        备份请妥善保管，勿提交到公开仓库。
+        另：固定网址 ?k= 令牌等同密码，勿对外分享。

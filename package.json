@@ -1,0 +1,20 @@
+{
+  "name": "novelverse",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "书声 · 小说阅读与听书平台（爬虫整合 + 在线阅读 + 听书 + 书架 + 历史）",
+  "scripts": {
+    "start": "node --no-warnings server.mjs",
+    "dev": "node --no-warnings --watch server.mjs",
+    "sync": "node --no-warnings scripts/sync.mjs",
+    "sync:full": "node --no-warnings scripts/sync.mjs full",
+    "sync:deep": "node --no-warnings scripts/sync.mjs deep",
+    "sync:ultra": "node --no-warnings scripts/sync.mjs ultra",
+    "update": "node --no-warnings scripts/update.mjs",
+    "share": "node --no-warnings scripts/share.mjs"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  }
+}
